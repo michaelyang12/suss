@@ -4,6 +4,7 @@ use std::io::{self, BufRead, Write};
 use std::process::Command;
 
 const OPENAI_MODELS: &[&str] = &[
+    "gpt-5.1",
     "gpt-4o-mini",
     "gpt-4o",
     "o1-mini",

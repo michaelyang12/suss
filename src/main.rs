@@ -57,12 +57,12 @@ async fn main() {
 
     match res {
         Ok(response) => {
-            println!("{}", response);
+            print_formatted(&response);
 
-            // If -x flag and response contains a code block, offer to execute
+            // If -x flag, extract fix command and offer to execute
             if args.execute {
-                if let Some(cmd) = extract_command(&response) {
-                    print!("\n{} {}", "Execute:".yellow(), cmd.bright_green());
+                if let Some(cmd) = extract_fix_command(&response) {
+                    print!("\n{} {}", "Run:".yellow(), cmd.bright_green());
                     print!(" {} ", "[y/N]".yellow());
                     io::stdout().flush().unwrap();
 
@@ -83,33 +83,61 @@ async fn main() {
     }
 }
 
-/// Extract a command from markdown code blocks in the response
-fn extract_command(response: &str) -> Option<String> {
-    let mut in_block = false;
+/// Format and colorize the LLM response
+fn print_formatted(response: &str) {
+    let headers = ["CAUSE:", "FIX:", "FIX 1:", "FIX 2:", "FIX 3:",
+                    "WHY:", "COMMON CAUSES:", "DOCS:", "TRADE-OFF:"];
+
+    for line in response.lines() {
+        let trimmed = line.trim();
+
+        if headers.iter().any(|h| trimmed.starts_with(h)) {
+            // Split into header and content
+            if let Some(pos) = trimmed.find(':') {
+                let (header, rest) = trimmed.split_at(pos + 1);
+                print!("{}", header.cyan().bold());
+                println!("{}", rest);
+            }
+        } else if trimmed.starts_with("- ") {
+            // Bullet points in COMMON CAUSES
+            println!("  {}", trimmed.dimmed());
+        } else if trimmed.is_empty() {
+            println!();
+        } else {
+            println!("  {}", trimmed);
+        }
+    }
+}
+
+/// Extract the first FIX command from the response (for -x execute mode)
+fn extract_fix_command(response: &str) -> Option<String> {
+    let mut in_fix = false;
     let mut command = String::new();
 
     for line in response.lines() {
-        if line.starts_with("```") {
-            if in_block {
-                let trimmed = command.trim().to_string();
-                if !trimmed.is_empty() {
-                    return Some(trimmed);
-                }
-                command.clear();
-                in_block = false;
-            } else {
-                in_block = true;
-                command.clear();
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("FIX:") || trimmed.starts_with("FIX 1:") {
+            let content = trimmed
+                .trim_start_matches("FIX 1:")
+                .trim_start_matches("FIX:")
+                .trim();
+            if !content.is_empty() {
+                return Some(content.to_string());
             }
-        } else if in_block {
+            in_fix = true;
+        } else if in_fix {
+            if trimmed.is_empty() || trimmed.ends_with(':') {
+                break;
+            }
             if !command.is_empty() {
                 command.push('\n');
             }
-            command.push_str(line);
+            command.push_str(trimmed);
         }
     }
 
-    None
+    if command.trim().is_empty() { None } else { Some(command.trim().to_string()) }
 }
 
 fn execute_command(cmd: &str) {

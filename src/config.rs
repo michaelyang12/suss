@@ -43,7 +43,7 @@ impl Config {
     }
 
     pub fn openai_model(&self) -> &str {
-        self.openai_model.as_deref().unwrap_or("gpt-4o-mini")
+        self.openai_model.as_deref().unwrap_or("gpt-5.1")
     }
 
     pub fn anthropic_model(&self) -> &str {
