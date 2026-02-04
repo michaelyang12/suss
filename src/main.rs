@@ -1,4 +1,5 @@
 mod args;
+mod client;
 mod config;
 mod context;
 
