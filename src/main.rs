@@ -2,6 +2,7 @@ mod args;
 mod client;
 mod config;
 mod context;
+mod setup;
 
 use args::Args;
 use clap::Parser;
