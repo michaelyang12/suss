@@ -36,7 +36,7 @@ async fn main() {
     }
 
     if args.input.trim().is_empty() {
-        eprintln!("{}", "Usage: ss \"error message\" or pipe: cmd 2>&1 | ss".red());
+        eprintln!("{}", "Usage: suss \"error message\" or pipe: cmd 2>&1 | suss".red());
         std::process::exit(1);
     }
 

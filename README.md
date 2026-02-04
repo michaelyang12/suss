@@ -12,26 +12,26 @@ cargo install --git https://github.com/michaelyang12/suss.git --locked
 
 ```bash
 # Pipe errors
-cargo build 2>&1 | ss
-npm run build 2>&1 | ss
+cargo build 2>&1 | suss
+npm run build 2>&1 | suss
 
 # Paste directly
-ss "error[E0382]: borrow of moved value"
+suss "error[E0382]: borrow of moved value"
 
 # Verbose — deeper context and docs
-cargo build 2>&1 | ss -v
+cargo build 2>&1 | suss -v
 
 # Alternatives — multiple fix approaches
-cargo build 2>&1 | ss --alt
+cargo build 2>&1 | suss --alt
 
 # Execute — run the suggested fix
-cargo build 2>&1 | ss -x
+cargo build 2>&1 | suss -x
 ```
 
 ## Setup
 
 ```bash
-ss --config
+suss --config
 ```
 
 Supports OpenAI, Anthropic, and Ollama (local). API keys via environment variables:
