@@ -1,5 +1,6 @@
 mod args;
 mod config;
+mod context;
 
 use args::Args;
 use clap::Parser;
