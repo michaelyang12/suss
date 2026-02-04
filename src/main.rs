@@ -5,7 +5,7 @@ mod context;
 mod setup;
 
 use std::io::{self, BufRead, Read, Write};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use args::Args;
 use client::{RequestClient, RequestMode};
