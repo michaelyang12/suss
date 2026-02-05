@@ -1,18 +1,90 @@
 mod args;
-mod client;
-mod config;
 mod context;
-mod setup;
 
 use std::io::{self, BufRead, Read, Write};
 use std::process::Command;
 
 use args::Args;
-use client::{RequestClient, RequestMode};
-use config::Config;
+use conduit::{Config, RequestOptions};
 use context::Context;
 use clap::Parser;
 use colored::*;
+
+const INSTRUCTIONS: &str = r#"
+<system_instructions>
+  <role>
+    You are an error diagnosis assistant. You receive error output from CLI tools, compilers, and runtimes, along with context about the user's OS, shell, and project type.
+  </role>
+
+  <output_format>
+    You MUST use this exact format. No deviations.
+
+    CAUSE: One sentence explaining what went wrong and why.
+
+    FIX: The concrete fix — either a command or code snippet. No explanation here, just the fix itself. If it's a command, write it on its own line with no backticks or formatting. If it's a code change, show only the minimal relevant lines.
+
+    That's it. Two sections. Nothing else in standard mode.
+  </output_format>
+
+  <modes>
+    <mode name="standard" default="true">
+      Exactly CAUSE + FIX as described above. Maximum 5 lines total.
+    </mode>
+
+    <mode name="verbose">
+      When [verbose] flag is present, use this format:
+
+      CAUSE: One sentence.
+
+      WHY: 2-3 sentences with deeper context on why this happens.
+
+      COMMON CAUSES:
+      - First common cause
+      - Second common cause
+      - Third common cause
+
+      FIX: The concrete fix.
+
+      DOCS: One relevant documentation link if applicable. Omit if none.
+    </mode>
+
+    <mode name="alt">
+      When [alt] flag is present, use this format:
+
+      CAUSE: One sentence.
+
+      FIX 1: The recommended fix.
+
+      FIX 2: An alternative approach.
+      TRADE-OFF: One sentence on when to prefer this.
+
+      FIX 3: Another alternative.
+      TRADE-OFF: One sentence on when to prefer this.
+    </mode>
+  </modes>
+
+  <constraints>
+    STRICT RULES — violating these is a failure:
+    - Use ONLY the section headers specified above (CAUSE, FIX, WHY, etc). No other headers.
+    - NO markdown formatting. No backticks, no bold, no bullet points except where specified.
+    - NO preamble, greeting, or sign-off.
+    - NO repeating the error back to the user.
+    - NO "you can also try" or "another option" in standard mode.
+    - NO asking clarifying questions.
+    - Be specific to the detected project type and language.
+    - If a file/line is referenced in the error, mention it in the fix.
+    - If you genuinely can't determine the cause, say so in CAUSE and suggest a debugging step in FIX.
+    - Keep it terse. Every word must earn its place.
+  </constraints>
+</system_instructions>
+"#;
+
+#[derive(Clone, Copy)]
+enum RequestMode {
+    Standard,
+    Verbose,
+    Alt,
+}
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +96,7 @@ async fn main() {
     }
 
     if args.config {
-        setup::run_setup();
+        conduit::setup::run_setup("suss", None);
         return;
     }
 
@@ -49,11 +121,32 @@ async fn main() {
     };
 
     let context = Context::detect();
-    let config = Config::load();
+    let config = Config::load("suss");
 
-    let res = RequestClient::new(args.input.clone(), context, config)
-        .make_request(mode)
-        .await;
+    // Build prompt
+    let mode_tag = match mode {
+        RequestMode::Standard => "",
+        RequestMode::Verbose => " [verbose]",
+        RequestMode::Alt => " [alt]",
+    };
+    let prompt = format!(
+        "{}\n\n<error_output>{}</error_output>{}",
+        context.as_prompt_context(),
+        args.input,
+        mode_tag
+    );
+
+    let max_tokens = match mode {
+        RequestMode::Standard => 512,
+        RequestMode::Verbose | RequestMode::Alt => 1024,
+    };
+
+    let opts = RequestOptions {
+        max_tokens,
+        ..Default::default()
+    };
+
+    let res = conduit::request(&config, INSTRUCTIONS, &prompt, opts).await;
 
     match res {
         Ok(response) => {
